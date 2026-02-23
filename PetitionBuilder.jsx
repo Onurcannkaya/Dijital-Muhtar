@@ -160,12 +160,15 @@ Tarih: ${today}
   const handleDownload = () => {
     setGenerating(true);
     try {
-      // Create PDF
-      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      // Create PDF. Depending on bundler, jsPDF might be default or named export.
+      // If we imported { jsPDF }, we use it. If there's an issue we fall back.
+      const DocClass = jsPDF ? jsPDF : window.jspdf.jsPDF;
+      const doc = new DocClass({ orientation: "portrait", unit: "mm", format: "a4" });
 
       // Setup Turkish-friendly encoding via font, but jsPDF uses standard Latin by default
       // We'll replace unsupported characters just in case it crashes, though jsPDF standard helvetica usually drops them silently.
       const replaceTR = (text) => {
+        if (!text) return "";
         return text
           .replace(/ğ/g, "g").replace(/Ğ/g, "G")
           .replace(/ş/g, "s").replace(/Ş/g, "S")
