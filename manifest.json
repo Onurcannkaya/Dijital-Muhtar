@@ -1,0 +1,68 @@
+{
+  "name": "Dijital Muhtar - Vatandaş Hak Asistanı",
+  "short_name": "Dijital Muhtar",
+  "description": "Resmi belgelerinizi analiz edin, en yakın hizmetleri bulun, dilekçelerinizi hazırlayın.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d2d5e",
+  "theme_color": "#1a4fa0",
+  "lang": "tr",
+  "categories": ["government", "utilities", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Belge Tara",
+      "short_name": "Belge Tara",
+      "description": "Yeni belge analiz et",
+      "url": "/?tab=scanner",
+      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Dilekçe Oluştur",
+      "short_name": "Dilekçe",
+      "description": "Hazır dilekçe şablonları",
+      "url": "/?tab=petition",
+      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}

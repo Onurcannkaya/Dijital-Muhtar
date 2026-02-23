@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#1a4fa0" />
+    <meta name="description" content="Vatandaş Hak ve Belge Asistanı - Resmi belgelerinizi analiz edin, en yakın hizmetleri bulun, dilekçelerinizi hazırlayın." />
+    <meta name="keywords" content="dijital muhtar, vatandaş, belge analiz, dilekçe, e-devlet, türkiye" />
+    <meta name="author" content="Dijital Muhtar" />
+    
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Dijital Muhtar" />
+    
+    <!-- Open Graph -->
+    <meta property="og:title" content="Dijital Muhtar - Vatandaş Hak Asistanı" />
+    <meta property="og:description" content="Resmi belgelerinizi yapay zeka ile analiz edin." />
+    <meta property="og:type" content="website" />
+
+    <title>Dijital Muhtar - Vatandaş Hak Asistanı</title>
+  </head>
+  <body>
+    <noscript>Bu uygulamayı kullanmak için JavaScript'i etkinleştirmeniz gerekmektedir.</noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+    <script>
+      // Register Service Worker
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('[SW] Registered:', reg.scope))
+            .catch(err => console.error('[SW] Registration failed:', err));
+        });
+      }
+    </script>
+  </body>
+</html>
