@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { FileText, Map, ScrollText, Home, ScanLine, ChevronRight, Shield, Bell } from "lucide-react";
-import OCRScanner from "./components/OCRScanner";
-import AIAssistant from "./components/AIAssistant";
-import MapComponent from "./components/MapComponent";
-import PetitionBuilder from "./components/PetitionBuilder";
+import OCRScanner from "./OCRScanner";
+import AIAssistant from "./AIAssistant";
+import MapComponent from "./MapComponent";
+import PetitionBuilder from "./PetitionBuilder";
 import "./App.css";
 
 const TABS = [
