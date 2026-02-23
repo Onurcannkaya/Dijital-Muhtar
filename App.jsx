@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { FileText, Map, ScrollText, Home, ScanLine, ChevronRight, Shield, Bell } from "lucide-react";
+import { FileText, Map, ScrollText, Home, ScanLine, ChevronRight, Shield, Bell, User } from "lucide-react";
 import OCRScanner from "./OCRScanner";
 import AIAssistant from "./AIAssistant";
 import MapComponent from "./MapComponent";
 import PetitionBuilder from "./PetitionBuilder";
+import AboutPage from "./AboutPage";
 import "./App.css";
 
 const TABS = [
@@ -11,6 +12,7 @@ const TABS = [
   { id: "scanner", label: "Belge Tara", icon: ScanLine },
   { id: "map", label: "Harita", icon: Map },
   { id: "petition", label: "Dilekçe", icon: ScrollText },
+  { id: "about", label: "Hakkında", icon: User },
 ];
 
 const QUICK_ACTIONS = [
@@ -141,6 +143,12 @@ export default function App() {
         {activeTab === "petition" && (
           <div className="tab-view">
             <PetitionBuilder />
+          </div>
+        )}
+
+        {activeTab === "about" && (
+          <div className="tab-view">
+            <AboutPage />
           </div>
         )}
       </main>
