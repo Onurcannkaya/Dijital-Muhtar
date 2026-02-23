@@ -23,12 +23,22 @@ const QUICK_ACTIONS = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("home");
-  const [ocrResult, setOcrResult] = useState(null);
+  const [ocrResult, setOcrResult] = useState(null); // Now stores base64 image data url
+  const [extractedData, setExtractedData] = useState(null); // Stores JSON sent from Gemini
   const [notification] = useState("Yeni güncelleme: İtiraz dilekçe şablonu eklendi.");
 
-  const handleScanComplete = (text) => {
-    setOcrResult(text);
+  const handleScanComplete = (dataUrl) => {
+    setOcrResult(dataUrl);
     setActiveTab("scanner");
+  };
+
+  const handleDataExtracted = (data) => {
+    if (data._nav === "petition") {
+      setActiveTab("petition");
+    } else {
+      // Store the structured JSON in app state so PetitionBuilder can use it
+      setExtractedData(data);
+    }
   };
 
   return (
@@ -129,7 +139,11 @@ export default function App() {
             {!ocrResult ? (
               <OCRScanner onScanComplete={handleScanComplete} />
             ) : (
-              <AIAssistant ocrText={ocrResult} onReset={() => setOcrResult(null)} />
+              <AIAssistant
+                imageDataUrl={ocrResult}
+                onReset={() => { setOcrResult(null); setExtractedData(null); }}
+                onDataExtracted={handleDataExtracted}
+              />
             )}
           </div>
         )}
@@ -142,7 +156,7 @@ export default function App() {
 
         {activeTab === "petition" && (
           <div className="tab-view">
-            <PetitionBuilder />
+            <PetitionBuilder initialData={extractedData} />
           </div>
         )}
 

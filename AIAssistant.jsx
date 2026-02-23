@@ -1,19 +1,49 @@
 import { useState, useEffect } from "react";
-import { Sparkles, RefreshCw, AlertTriangle, Clock, BookOpen, ListChecks, Copy, CheckCheck } from "lucide-react";
+import { Sparkles, RefreshCw, AlertTriangle, BookOpen, Copy, CheckCheck, FileEdit } from "lucide-react";
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-const SYSTEM_PROMPT = `Sen bir 'Dijital Muhtar' asistanısın. Görevin, sana gönderilen resmi belgelerdeki hukuki ve bürokratik dili, ilkokul düzeyindeki bir vatandaşın anlayabileceği sadeliğe indirmektir. Yanıtlarını her zaman tam olarak şu 5 başlığı kullanarak ver:
+const SYSTEM_PROMPT = `Sen bir 'Dijital Muhtar' asistanısın. Görevin, sana gönderilen resmi belge fotoğrafını inceleyip analiz etmektir.
+Yanıtını iki bölüm halinde ver:
+
+BÖLÜM 1 (METİNSEL ANALİZ):
+Belgedeki hukuki dili vatandaşın anlayacağı sadeliğe indir. Kesinlikle şu 5 başlığı kullan:
 1. Özet
 2. Önemli Tarihler
 3. Adım Adım Eylem Planı
 4. Yasal Hakların
 5. Kritik Uyarılar
 
-Kesinlikle avukat edasıyla değil, yardımcı bir komşu edasıyla konuş.`;
+BÖLÜM 2 (YAPILANDIRILMIŞ VERİ):
+Dilekçe formlarını otomatik doldurmak için belgeden çıkardığın verileri tam olarak aşağıdaki JSON formatında, \`\`\`json ve \`\`\` etiketleri arasına yaz. Bulamadığın alanları boş bırak:
+\`\`\`json
+{
+  "tutar": "",
+  "kurum_adi": "",
+  "belge_tarihi": "",
+  "dosya_no": "",
+  "itiraz_mercii": "",
+  "ihlal_maddesi": ""
+}
+\`\`\`
+`;
 
 function parseAIResponse(text) {
+  // 1) Extract JSON if present
+  let extractedJson = null;
+  const jsonRegex = /```json\s*(\{[\s\S]*?\})\s*```/;
+  const jsonMatch = text.match(jsonRegex);
+  if (jsonMatch && jsonMatch[1]) {
+    try {
+      extractedJson = JSON.parse(jsonMatch[1]);
+    } catch (e) {
+      console.warn("JSON parse error:", e);
+    }
+    text = text.replace(jsonRegex, ""); // remove JSON block from text
+  }
+
+  // 2) Parse Text Sections
   const sections = [
     { key: "ozet", prefix: "1. Özet", icon: "📋", title: "Özet" },
     { key: "tarihler", prefix: "2. Önemli Tarihler", icon: "⏰", title: "Önemli Tarihler" },
@@ -22,7 +52,7 @@ function parseAIResponse(text) {
     { key: "uyarilar", prefix: "5. Kritik Uyarılar", icon: "🚨", title: "Kritik Uyarılar" },
   ];
 
-  const result = [];
+  const parsedSections = [];
   for (let i = 0; i < sections.length; i++) {
     const s = sections[i];
     const startIdx = text.indexOf(s.prefix);
@@ -30,16 +60,17 @@ function parseAIResponse(text) {
     const contentStart = text.indexOf("\n", startIdx) + 1;
     const nextSection = i + 1 < sections.length ? text.indexOf(sections[i + 1].prefix) : -1;
     const content = (nextSection === -1 ? text.slice(contentStart) : text.slice(contentStart, nextSection)).trim();
-    if (content) result.push({ ...s, content });
+    if (content) parsedSections.push({ ...s, content });
   }
 
-  if (result.length === 0) {
-    return [{ key: "raw", icon: "📄", title: "AI Analizi", content: text }];
+  if (parsedSections.length === 0) {
+    parsedSections.push({ key: "raw", icon: "📄", title: "AI Analizi", content: text.trim() });
   }
-  return result;
+
+  return { sections: parsedSections, extractedData: extractedJson };
 }
 
-export default function AIAssistant({ ocrText, onReset }) {
+export default function AIAssistant({ imageDataUrl, onReset, onDataExtracted }) {
   const [status, setStatus] = useState("idle"); // idle | loading | done | error | no-key
   const [sections, setSections] = useState([]);
   const [error, setError] = useState("");
@@ -50,15 +81,19 @@ export default function AIAssistant({ ocrText, onReset }) {
       setStatus("no-key");
       return;
     }
-    if (ocrText) {
-      analyzeDocument(ocrText);
+    if (imageDataUrl) {
+      analyzeDocument(imageDataUrl);
     }
-  }, [ocrText]);
+  }, [imageDataUrl]);
 
-  const analyzeDocument = async (text) => {
+  const analyzeDocument = async (b64Image) => {
     setStatus("loading");
     setError("");
     try {
+      // Split "data:image/jpeg;base64,..." into mime Type and base64 string
+      const [header, base64] = b64Image.split(",");
+      const mimeType = header.match(/:(.*?);/)[1];
+
       const response = await fetch(GEMINI_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -67,11 +102,16 @@ export default function AIAssistant({ ocrText, onReset }) {
             {
               parts: [
                 { text: SYSTEM_PROMPT },
-                { text: `\n\n---BELGE METNİ---\n${text}` },
+                {
+                  inlineData: {
+                    mimeType: mimeType,
+                    data: base64,
+                  },
+                },
               ],
             },
           ],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 1500 },
+          generationConfig: { temperature: 0.1, maxOutputTokens: 2000 },
         }),
       });
 
@@ -83,8 +123,14 @@ export default function AIAssistant({ ocrText, onReset }) {
       const data = await response.json();
       const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!raw) throw new Error("Geçersiz API yanıtı");
-      setSections(parseAIResponse(raw));
+
+      const { sections: parsedSecs, extractedData } = parseAIResponse(raw);
+      setSections(parsedSecs);
       setStatus("done");
+
+      if (extractedData && Object.values(extractedData).some(v => v)) {
+        if (onDataExtracted) onDataExtracted(extractedData);
+      }
     } catch (err) {
       console.error(err);
       setError(err.message || "Bilinmeyen hata");
@@ -110,14 +156,17 @@ export default function AIAssistant({ ocrText, onReset }) {
       </div>
       <p className="page-desc">Belgeniz Gemini AI tarafından analiz edildi.</p>
 
-      {/* OCR Preview */}
+      {/* Image Preview */}
       <div className="card" style={{ marginBottom: 14 }}>
         <div className="card-title" style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginBottom: 8 }}>
-          <BookOpen size={14} /> Okunan Metin (Önizleme)
+          <BookOpen size={14} /> İncelenen Belge
         </div>
-        <div style={{ fontSize: "0.78rem", color: "var(--text-secondary)", maxHeight: 80, overflow: "hidden", position: "relative" }}>
-          {ocrText?.substring(0, 200)}{ocrText?.length > 200 && "..."}
-          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 24, background: "linear-gradient(transparent, white)" }} />
+        <div style={{ textAlign: "center" }}>
+          <img
+            src={imageDataUrl}
+            alt="İncelenen Belge"
+            style={{ maxWidth: "100%", maxHeight: 120, objectFit: "contain", borderRadius: 8, border: "1px solid var(--border)" }}
+          />
         </div>
       </div>
 
@@ -144,8 +193,8 @@ export default function AIAssistant({ ocrText, onReset }) {
             <div className="spinner" />
             <Sparkles size={16} style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", color: "var(--tc-blue)" }} />
           </div>
-          <span style={{ fontWeight: 600 }}>Belge analiz ediliyor...</span>
-          <span style={{ fontSize: "0.8rem", textAlign: "center" }}>Gemini AI belgenizi okuyup yorumluyor. Bu 5-15 saniye sürebilir.</span>
+          <span style={{ fontWeight: 600 }}>Yapay Zeka İnceliyor...</span>
+          <span style={{ fontSize: "0.8rem", textAlign: "center" }}>Gemini 2.0 Vision belgenizdeki verileri çıkarıyor ve analiz ediyor.</span>
         </div>
       )}
 
@@ -156,7 +205,7 @@ export default function AIAssistant({ ocrText, onReset }) {
             <AlertTriangle size={18} /> Analiz Başarısız
           </div>
           <p style={{ fontSize: "0.88rem", color: "var(--text-secondary)", marginBottom: 16 }}>{error}</p>
-          <button className="btn btn-primary" onClick={() => analyzeDocument(ocrText)}>
+          <button className="btn btn-primary" onClick={() => analyzeDocument(imageDataUrl)}>
             <RefreshCw size={16} /> Tekrar Dene
           </button>
         </div>
@@ -165,6 +214,17 @@ export default function AIAssistant({ ocrText, onReset }) {
       {/* DONE */}
       {status === "done" && (
         <div>
+          {/* Action to proceed to PetitionBuilder */}
+          <div style={{ marginBottom: 16 }}>
+            <button
+              className="btn btn-primary"
+              style={{ width: "100%", padding: "14px", fontSize: "0.95rem", background: "linear-gradient(135deg, var(--tc-blue), #1e293b)", border: "none" }}
+              onClick={() => onDataExtracted && onDataExtracted({ _nav: "petition" })}
+            >
+              <FileEdit size={18} style={{ marginRight: 8 }} /> Veriler dilekçeye aktarıldı, hazırlamak için tıklayın
+            </button>
+          </div>
+
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
             <button className="btn btn-secondary btn-sm" style={{ width: "auto", padding: "8px 14px" }} onClick={copyAll}>
               {copied ? <><CheckCheck size={15} /> Kopyalandı</> : <><Copy size={15} /> Tümünü Kopyala</>}

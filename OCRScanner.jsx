@@ -1,23 +1,9 @@
 import { useState, useRef, useCallback } from "react";
 import { Camera, Upload, X, CheckCircle, ScanLine, RefreshCw, ZoomIn } from "lucide-react";
 
-// Tesseract is loaded dynamically to avoid bundling issues
-const loadTesseract = () => import("tesseract.js");
-
-const PROGRESS_MESSAGES = [
-  "Görüntü yükleniyor...",
-  "Metin alanları tespit ediliyor...",
-  "Karakterler tanınıyor...",
-  "Türkçe dil modeli uygulanıyor...",
-  "Sonuçlar hazırlanıyor...",
-];
-
 export default function OCRScanner({ onScanComplete }) {
-  const [mode, setMode] = useState("idle"); // idle | camera | uploading | processing | done | error
+  const [mode, setMode] = useState("idle"); // idle | camera | captured | error
   const [imageDataUrl, setImageDataUrl] = useState(null);
-  const [progress, setProgress] = useState(0);
-  const [progressMsg, setProgressMsg] = useState("");
-  const [extractedText, setExtractedText] = useState("");
   const [error, setError] = useState("");
 
   const videoRef = useRef(null);
@@ -60,7 +46,7 @@ export default function OCRScanner({ onScanComplete }) {
     const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
     setImageDataUrl(dataUrl);
     stopCamera();
-    runOCR(dataUrl);
+    setMode("captured");
   };
 
   const handleFileUpload = (e) => {
@@ -70,58 +56,23 @@ export default function OCRScanner({ onScanComplete }) {
     reader.onload = (ev) => {
       const dataUrl = ev.target.result;
       setImageDataUrl(dataUrl);
-      runOCR(dataUrl);
+      setMode("captured");
     };
     reader.readAsDataURL(file);
-  };
-
-  const runOCR = async (dataUrl) => {
-    setMode("processing");
-    setProgress(0);
-    setExtractedText("");
-    try {
-      const { createWorker } = await loadTesseract();
-      const worker = await createWorker("tur+eng", 1, {
-        logger: (m) => {
-          if (m.status === "recognizing text") {
-            const pct = Math.round(m.progress * 100);
-            setProgress(pct);
-            const msgIdx = Math.min(Math.floor(pct / 20), PROGRESS_MESSAGES.length - 1);
-            setProgressMsg(PROGRESS_MESSAGES[msgIdx]);
-          }
-        },
-      });
-      const { data } = await worker.recognize(dataUrl);
-      await worker.terminate();
-      const text = data.text.trim();
-      if (!text) {
-        setError("Belgede okunabilir metin bulunamadı. Lütfen daha net bir fotoğraf çekin.");
-        setMode("error");
-        return;
-      }
-      setExtractedText(text);
-      setMode("done");
-    } catch (err) {
-      console.error(err);
-      setError("OCR işlemi sırasında bir hata oluştu. Lütfen tekrar deneyin.");
-      setMode("error");
-    }
   };
 
   const reset = () => {
     stopCamera();
     setMode("idle");
     setImageDataUrl(null);
-    setExtractedText("");
     setError("");
-    setProgress(0);
   };
 
   return (
     <div>
       <h1 className="page-title">Belge Tarayıcı</h1>
       <p className="page-desc">
-        Resmi belgenizi kamera ile çekin veya galeriden yükleyin. Yapay zeka ile analiz edilecek.
+        Resmi belgenizi kamera ile çekin veya galeriden yükleyin. Yapay zeka ile anında analiz edilecek.
       </p>
 
       {/* IDLE */}
@@ -152,8 +103,7 @@ export default function OCRScanner({ onScanComplete }) {
             <ul style={{ fontSize: "0.82rem", color: "var(--text-secondary)", lineHeight: 1.8, paddingLeft: 16 }}>
               <li>İyi aydınlatılmış bir ortamda çekin</li>
               <li>Belge düz ve titreşimsiz olsun</li>
-              <li>Tüm metin alanları kadr içinde olsun</li>
-              <li>Minimum 5 MP kamera önerilir</li>
+              <li>Tüm metin alanları kadraj içinde olsun</li>
             </ul>
           </div>
         </div>
@@ -185,51 +135,23 @@ export default function OCRScanner({ onScanComplete }) {
         </div>
       )}
 
-      {/* PROCESSING */}
-      {mode === "processing" && (
-        <div>
-          {imageDataUrl && (
-            <img src={imageDataUrl} alt="Taranan belge" style={{ width: "100%", borderRadius: "var(--radius)", marginBottom: 16, border: "1.5px solid var(--border)" }} />
-          )}
-          <div className="card" style={{ textAlign: "center" }}>
-            <div className="card-title" style={{ justifyContent: "center" }}>
-              <ScanLine size={18} /> Metin Okunuyor
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ background: "var(--bg-base)", borderRadius: 100, height: 8, overflow: "hidden", marginBottom: 8 }}>
-                <div style={{ height: "100%", width: `${progress}%`, background: "var(--tc-blue)", borderRadius: 100, transition: "width 0.3s" }} />
-              </div>
-              <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{progress}% — {progressMsg}</span>
-            </div>
-            <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>
-              Bu işlem 10-30 saniye sürebilir. Lütfen bekleyin.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* DONE */}
-      {mode === "done" && (
+      {/* CAPTURED */}
+      {mode === "captured" && (
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, color: "var(--tc-green)", fontWeight: 700 }}>
             <CheckCircle size={22} />
-            <span>Metin başarıyla okundu!</span>
+            <span>Fotoğraf hazır!</span>
           </div>
           {imageDataUrl && (
-            <img src={imageDataUrl} alt="Taranan belge" style={{ width: "100%", borderRadius: "var(--radius)", marginBottom: 14, border: "1.5px solid var(--border)", maxHeight: 200, objectFit: "cover" }} />
+            <img src={imageDataUrl} alt="Taranan belge" style={{ width: "100%", borderRadius: "var(--radius)", marginBottom: 14, border: "1.5px solid var(--border)", maxHeight: 300, objectFit: "contain", background: "#f8f9fa" }} />
           )}
-          <div className="card">
-            <div className="card-title">
-              <ZoomIn size={16} /> Okunan Metin
-            </div>
-            <div className="result-box">{extractedText}</div>
-          </div>
+
           <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
             <button className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={reset}>
-              <RefreshCw size={16} /> Yeniden Tara
+              <RefreshCw size={16} /> Yeniden Çek
             </button>
-            <button className="btn btn-primary btn-sm" style={{ flex: 2 }} onClick={() => onScanComplete(extractedText)}>
-              ✨ AI ile Analiz Et
+            <button className="btn btn-primary btn-sm" style={{ flex: 2 }} onClick={() => onScanComplete(imageDataUrl)}>
+              ✨ Yapay Zeka ile İncele
             </button>
           </div>
         </div>

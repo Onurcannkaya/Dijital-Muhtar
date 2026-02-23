@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ScrollText, Download, Eye, ChevronDown, ChevronUp } from "lucide-react";
+import { jsPDF } from "jspdf";
 
 const TEMPLATES = [
   {
@@ -9,13 +10,13 @@ const TEMPLATES = [
     fields: ["ad_soyad", "tc_kimlik", "adres", "ceza_no", "ceza_tarihi", "plaka", "itiraz_gerekce"],
     body: (f) => `Sayın İlgili Makam,
 
-${f.ceza_tarihi} tarihinde ${f.plaka} plakalı araç sahibi olarak ${f.ceza_no} sayılı trafik cezasına muhatap olduğumu bildirmek isterim.
+${f.ceza_tarihi || "..."} tarihinde ${f.plaka || "..."} plakalı araç sahibi olarak ${f.ceza_no || "..."} sayılı trafik cezasına muhatap olduğumu bildirmek isterim.
 
 Söz konusu cezaya aşağıda belirtilen nedenlerle itiraz etmek zorundayım:
 
-${f.itiraz_gerekce}
+${f.itiraz_gerekce || "..."}
 
-Bu nedenle, ${f.ceza_no} sayılı trafik cezasının iptalini saygıyla talep ederim.
+Bu nedenle, ${f.ceza_no || "..."} sayılı trafik cezasının iptalini saygıyla talep ederim.
 
 Gereğini bilgilerinize arz ederim.`,
     konu: "Trafik Para Cezasına İtiraz",
@@ -28,11 +29,11 @@ Gereğini bilgilerinize arz ederim.`,
     fields: ["ad_soyad", "tc_kimlik", "adres", "kurum_adi", "talep_konusu"],
     body: (f) => `Sayın Yetkili,
 
-4982 sayılı Bilgi Edinme Hakkı Kanunu kapsamında, ${f.talep_konusu} konusunda bilgi ve/veya belge edinme talebinde bulunmaktayım.
+4982 sayılı Bilgi Edinme Hakkı Kanunu kapsamında, ${f.talep_konusu || "..."} konusunda bilgi ve/veya belge edinme talebinde bulunmaktayım.
 
 Kanunun öngördüğü 15 iş günü içinde tarafıma gerekli bilgi ve belgelerin iletilmesini saygıyla talep ederim.`,
     konu: "Bilgi Edinme Talebi",
-    muhatap: (f) => `${f.kurum_adi} Müdürlüğüne`,
+    muhatap: (f) => `${f.kurum_adi || "İlgili Kurum"} Müdürlüğüne`,
   },
   {
     id: "ikayet",
@@ -41,10 +42,10 @@ Kanunun öngördüğü 15 iş günü içinde tarafıma gerekli bilgi ve belgeler
     fields: ["ad_soyad", "tc_kimlik", "adres", "sikayet_konusu", "sikayet_tarihi", "sikayet_aciklama"],
     body: (f) => `Sayın İlgili Makam,
 
-${f.sikayet_tarihi} tarihinde ${f.sikayet_konusu} konusunda mağduriyete uğradığımı bildirmek isterim.
+${f.sikayet_tarihi || "..."} tarihinde ${f.sikayet_konusu || "..."} konusunda mağduriyete uğradığımı bildirmek isterim.
 
 OLAY AÇIKLAMASI:
-${f.sikayet_aciklama}
+${f.sikayet_aciklama || "..."}
 
 Yaşanan mağduriyetimin giderilmesi ve gerekli işlemlerin yapılması için tarafınıza başvurmaktayım. Konu hakkında tarafıma bilgi verilmesini saygıyla talep ederim.`,
     konu: "Şikâyet ve Şikâyet Bildirimi",
@@ -57,9 +58,9 @@ Yaşanan mağduriyetimin giderilmesi ve gerekli işlemlerin yapılması için ta
     fields: ["ad_soyad", "tc_kimlik", "adres", "mal_sahibi", "kira_adresi", "mevcut_kira", "talep_nedeni"],
     body: (f) => `Sayın İlgili Makam,
 
-${f.kira_adresi} adresinde ${f.mal_sahibi} adlı kişiye ait taşınmazda kiracı sıfatıyla ikamet etmekteyim. Mevcut kira bedeli aylık ${f.mevcut_kira} TL olup;
+${f.kira_adresi || "..."} adresinde ${f.mal_sahibi || "..."} adlı kişiye ait taşınmazda kiracı sıfatıyla ikamet etmekteyim. Mevcut kira bedeli aylık ${f.mevcut_kira || "..."} TL olup;
 
-${f.talep_nedeni}
+${f.talep_nedeni || "..."}
 
 Bu nedenlerle taşınmazın güncel piyasa rayicine uygun kira bedelinin tespitini saygıyla talep ederim.`,
     konu: "Kira Bedeli Tespiti Talebi",
@@ -88,7 +89,7 @@ const FIELD_LABELS = {
 
 const MULTILINE = ["itiraz_gerekce", "sikayet_aciklama", "talep_nedeni", "talep_konusu", "adres"];
 
-export default function PetitionBuilder() {
+export default function PetitionBuilder({ initialData }) {
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [formData, setFormData] = useState({});
   const [preview, setPreview] = useState("");
@@ -96,9 +97,30 @@ export default function PetitionBuilder() {
   const [generating, setGenerating] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  // Auto-fill form from Gemini JSON if present
+  useEffect(() => {
+    if (initialData && Object.keys(initialData).length > 0) {
+      const autoFill = {};
+
+      // Try to intelligently match detected fields to template fields
+      if (initialData.dosya_no) autoFill.ceza_no = initialData.dosya_no;
+      if (initialData.belge_tarihi) {
+        autoFill.ceza_tarihi = initialData.belge_tarihi;
+        autoFill.sikayet_tarihi = initialData.belge_tarihi;
+      }
+      if (initialData.kurum_adi) autoFill.kurum_adi = initialData.kurum_adi;
+      if (initialData.tutar) autoFill.mevcut_kira = initialData.tutar;
+      if (initialData.ihlal_maddesi) {
+        autoFill.itiraz_gerekce = `Hakkımda uygulanan ${initialData.ihlal_maddesi} numaralı madde ihlali asılsızdır...`;
+      }
+
+      setFormData((prev) => ({ ...prev, ...autoFill }));
+    }
+  }, [initialData]);
+
   const selectTemplate = (tpl) => {
     setSelectedTemplate(tpl);
-    setFormData({});
+    // Keep auto-filled data when switching templates, only reset invalid ones
     setPreview("");
     setShowPreview(false);
     setSuccess(false);
@@ -135,11 +157,23 @@ Tarih: ${today}
     setShowPreview(true);
   };
 
-  const handleDownload = async () => {
+  const handleDownload = () => {
     setGenerating(true);
     try {
-      const { jsPDF } = await import("jspdf");
+      // Create PDF
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+      // Setup Turkish-friendly encoding via font, but jsPDF uses standard Latin by default
+      // We'll replace unsupported characters just in case it crashes, though jsPDF standard helvetica usually drops them silently.
+      const replaceTR = (text) => {
+        return text
+          .replace(/ğ/g, "g").replace(/Ğ/g, "G")
+          .replace(/ş/g, "s").replace(/Ş/g, "S")
+          .replace(/ı/g, "i").replace(/İ/g, "I")
+          .replace(/ö/g, "o").replace(/Ö/g, "O")
+          .replace(/ç/g, "c").replace(/Ç/g, "C")
+          .replace(/ü/g, "u").replace(/Ü/g, "U");
+      };
 
       const today = new Date().toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" });
 
@@ -148,13 +182,14 @@ Tarih: ${today}
       doc.setFont("helvetica", "bold");
       doc.text("T.C.", 105, 20, { align: "center" });
       doc.setFontSize(12);
-      doc.text(selectedTemplate.konu.toUpperCase(), 105, 28, { align: "center" });
+      doc.text(replaceTR(selectedTemplate.konu.toUpperCase()), 105, 28, { align: "center" });
       doc.setLineWidth(0.5);
       doc.line(20, 32, 190, 32);
 
-      const muhatap = typeof selectedTemplate.muhatap === "function" ? selectedTemplate.muhatap(formData) : selectedTemplate.muhatap;
+      const rawMuhatap = typeof selectedTemplate.muhatap === "function" ? selectedTemplate.muhatap(formData) : selectedTemplate.muhatap;
       const body = selectedTemplate.body(formData);
-      const fullText = `${muhatap}\n\n${body}\n\n---\nAd Soyad: ${formData.ad_soyad || ""}\nT.C. Kimlik No: ${formData.tc_kimlik || ""}\nAdres: ${formData.adres || ""}\nTarih: ${today}\nİmza:`;
+
+      const fullText = replaceTR(`${rawMuhatap}\n\n${body}\n\n---\nAd Soyad: ${formData.ad_soyad || ""}\nT.C. Kimlik No: ${formData.tc_kimlik || ""}\nAdres: ${formData.adres || ""}\nTarih: ${today}\nİmza:`);
 
       doc.setFontSize(11);
       doc.setFont("helvetica", "normal");
@@ -184,13 +219,23 @@ Tarih: ${today}
 
   const isFormValid = () => {
     if (!selectedTemplate) return false;
-    return selectedTemplate.fields.every((f) => formData[f]?.trim());
+    // Just a loose validation instead of strict, to let users preview partial forms
+    return selectedTemplate.fields.some((f) => formData[f]?.trim());
   };
 
   return (
     <div>
       <h1 className="page-title">Dilekçe Oluşturucu</h1>
       <p className="page-desc">Hazır şablonlardan dilekçenizi oluşturun ve PDF olarak indirin. Verileriniz yalnızca cihazınızda işlenir.</p>
+
+      {/* Auto-fill notification */}
+      {initialData && Object.keys(initialData).length > 0 && !selectedTemplate && (
+        <div className="card" style={{ background: "#e0f2fe", borderColor: "#bde0fe" }}>
+          <p style={{ fontSize: "0.85rem", color: "#0284c7", fontWeight: 600, margin: 0 }}>
+            ✨ AI tarafından analiz edilen verileriniz hazır. Bir şablon seçtiğinizde ilgili alanlar otomatik doldurulacaktır.
+          </p>
+        </div>
+      )}
 
       {/* Template Selection */}
       <div className="card">
@@ -279,7 +324,7 @@ Tarih: ${today}
 
           {!isFormValid() && (
             <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: 10, textAlign: "center" }}>
-              Tüm alanları doldurunuz
+              En az bir alanı doldurunuz
             </p>
           )}
         </div>
