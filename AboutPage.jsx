@@ -6,7 +6,7 @@ export default function AboutPage() {
             <div className="about-header">
                 <div className="profile-image-container">
                     {/* We will use a placeholder or image passed by the user */}
-                    <img src="/assets/profile.jpg" alt="Onur Can Kaya" className="profile-image" />
+                    <img src="/assets/profile.png" alt="Onur Can Kaya" className="profile-image" />
                 </div>
                 <h1 className="profile-name">Onur Can Kaya</h1>
                 <p className="profile-title">Harita Mühendisi & CBS Uzmanı</p>
