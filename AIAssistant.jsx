@@ -113,7 +113,8 @@ export default function AIAssistant({ imageDataUrl, onReset, onDataExtracted }) 
         generationConfig: { temperature: 0.1, maxOutputTokens: 2000 },
       });
 
-      const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.5-flash", "gemini-3.0-flash"]; // Gemini-3 vs henüz yoksa 1.5'ten başla
+      // En yetenekli / kararlı olandan yeniye doğru sıralama (1.5 Pro en kapsamlı analizi yapar)
+      const modelsToTry = ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-3.0-flash"];
       let response = null;
 
       for (const modelName of modelsToTry) {
