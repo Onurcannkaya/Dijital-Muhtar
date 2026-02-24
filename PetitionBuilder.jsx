@@ -102,6 +102,14 @@ export default function PetitionBuilder({ initialData }) {
     if (initialData && Object.keys(initialData).length > 0) {
       const autoFill = {};
 
+      // Auto-select template if AI categorized it
+      if (initialData.dilekce_turu) {
+        const foundTpl = TEMPLATES.find((t) => t.id === initialData.dilekce_turu);
+        if (foundTpl) {
+          setSelectedTemplate(foundTpl);
+        }
+      }
+
       // Try to intelligently match detected fields to template fields
       if (initialData.dosya_no) autoFill.ceza_no = initialData.dosya_no;
       if (initialData.belge_tarihi) {
@@ -110,9 +118,15 @@ export default function PetitionBuilder({ initialData }) {
       }
       if (initialData.kurum_adi) autoFill.kurum_adi = initialData.kurum_adi;
       if (initialData.tutar) autoFill.mevcut_kira = initialData.tutar;
+      // Eğer itiraz_gerekce alanı yoksa oluştur
       if (initialData.ihlal_maddesi) {
-        autoFill.itiraz_gerekce = `Hakkımda uygulanan ${initialData.ihlal_maddesi} numaralı madde ihlali asılsızdır...`;
+        autoFill.itiraz_gerekce = `Hakkımda uygulanan ${initialData.ihlal_maddesi} numaralı madde ihlali asılsızdır. Durumun yeniden değerlendirilerek cezanın iptalini talep ediyorum.`;
       }
+
+      // Diğer kısımlar
+      if (initialData.plaka) autoFill.plaka = initialData.plaka;
+      if (initialData.konu) autoFill.talep_konusu = initialData.konu;
+      if (initialData.konu) autoFill.sikayet_konusu = initialData.konu;
 
       setFormData((prev) => ({ ...prev, ...autoFill }));
     }

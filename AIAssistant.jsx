@@ -16,9 +16,11 @@ Belgedeki hukuki dili vatandaşın anlayacağı sadeliğe indir. Kesinlikle şu 
 5. Kritik Uyarılar
 
 BÖLÜM 2 (YAPILANDIRILMIŞ VERİ):
-Dilekçe formlarını otomatik doldurmak için belgeden çıkardığın verileri tam olarak aşağıdaki JSON formatında, \`\`\`json ve \`\`\` etiketleri arasına yaz. Bulamadığın alanları boş bırak:
+Dilekçe formlarını otomatik doldurmak ve uygun şablonu seçmek için belgeden çıkardığın verileri JSON formatında yaz (\`\`\`json arasına).
+Eğer bu bir trafik cezasıysa "dilekce_turu" alanına "trafik-itiraz", kira ile ilgiliyse "kira", bilgi edinmeyse "bilgi-edinme", bunlara uymayan genel bir şikayet/itiraz ise "ikayet" yaz. Bulamadığın alanları boş bırak:
 \`\`\`json
 {
+  "dilekce_turu": "",
   "tutar": "",
   "kurum_adi": "",
   "belge_tarihi": "",
