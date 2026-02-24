@@ -111,7 +111,7 @@ export default function AIAssistant({ imageDataUrl, onReset, onDataExtracted }) 
         generationConfig: { temperature: 0.1, maxOutputTokens: 2000 },
       });
 
-      const modelsToTry = ["gemini-3-flash", "gemini-2.5-flash"];
+      const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.5-flash", "gemini-3.0-flash"]; // Gemini-3 vs henüz yoksa 1.5'ten başla
       let response = null;
 
       for (const modelName of modelsToTry) {
@@ -127,8 +127,9 @@ export default function AIAssistant({ imageDataUrl, onReset, onDataExtracted }) 
             break;
           }
 
-          if (res.status === 429 || res.status === 503) {
-            console.warn(`[${modelName}] Limite ulaşıldı veya servis meşgul. Sıradaki modele geçiliyor...`);
+          // Eğer model bulunamadıysa (404), yetki yoksa (403), kota dolduysa (429) veya servis yoksa (503) diğerine geç
+          if (res.status === 404 || res.status === 403 || res.status === 400 || res.status === 429 || res.status === 503) {
+            console.warn(`[${modelName}] Hata aldı (${res.status}). Sıradaki modele geçiliyor...`);
             continue;
           } else {
             const errData = await res.json().catch(() => null);
