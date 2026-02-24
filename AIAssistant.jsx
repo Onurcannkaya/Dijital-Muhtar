@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Sparkles, RefreshCw, AlertTriangle, BookOpen, Copy, CheckCheck, FileEdit } from "lucide-react";
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+const getGeminiUrl = (model) => `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
 
 const SYSTEM_PROMPT = `Sen bir 'Dijital Muhtar' asistanısın. Görevin, sana gönderilen resmi belge fotoğrafını inceleyip analiz etmektir.
 Yanıtını iki bölüm halinde ver:
@@ -94,30 +94,54 @@ export default function AIAssistant({ imageDataUrl, onReset, onDataExtracted }) 
       const [header, base64] = b64Image.split(",");
       const mimeType = header.match(/:(.*?);/)[1];
 
-      const response = await fetch(GEMINI_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: SYSTEM_PROMPT },
-                {
-                  inlineData: {
-                    mimeType: mimeType,
-                    data: base64,
-                  },
+      const requestBody = JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: SYSTEM_PROMPT },
+              {
+                inlineData: {
+                  mimeType: mimeType,
+                  data: base64,
                 },
-              ],
-            },
-          ],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 2000 },
-        }),
+              },
+            ],
+          },
+        ],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 2000 },
       });
 
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData?.error?.message || "API hatası");
+      const modelsToTry = ["gemini-3-flash", "gemini-2.5-flash"];
+      let response = null;
+
+      for (const modelName of modelsToTry) {
+        try {
+          const res = await fetch(getGeminiUrl(modelName), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: requestBody,
+          });
+
+          if (res.ok) {
+            response = res;
+            break;
+          }
+
+          if (res.status === 429 || res.status === 503) {
+            console.warn(`[${modelName}] Limite ulaşıldı veya servis meşgul. Sıradaki modele geçiliyor...`);
+            continue;
+          } else {
+            const errData = await res.json().catch(() => null);
+            throw new Error(errData?.error?.message || `API hatası (${res.status})`);
+          }
+        } catch (e) {
+          if (modelName === modelsToTry[modelsToTry.length - 1]) throw e;
+          console.warn(`[${modelName}] İsteği başarısız:`, e);
+        }
+      }
+
+      if (!response || !response.ok) {
+        throw new Error("Tüm modeller denendi ancak başarılı olunamadı, limitleriniz dolmuş olabilir.");
       }
 
       const data = await response.json();
@@ -194,7 +218,7 @@ export default function AIAssistant({ imageDataUrl, onReset, onDataExtracted }) 
             <Sparkles size={16} style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", color: "var(--tc-blue)" }} />
           </div>
           <span style={{ fontWeight: 600 }}>Yapay Zeka İnceliyor...</span>
-          <span style={{ fontSize: "0.8rem", textAlign: "center" }}>Gemini 2.0 Vision belgenizdeki verileri çıkarıyor ve analiz ediyor.</span>
+          <span style={{ fontSize: "0.8rem", textAlign: "center" }}>Gemini Vision belgenizdeki verileri çıkarıyor ve analiz ediyor.</span>
         </div>
       )}
 
